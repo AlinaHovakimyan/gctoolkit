@@ -1,6 +1,6 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
-package com.microsoft.gctoolkit.parser.patterns;
+package com.microsoft.gctoolkit.parser;
 
 
 import com.microsoft.gctoolkit.event.MemoryPoolSummary;
@@ -43,6 +43,10 @@ public abstract class ParserTest {
      * @return A GCLogParser appropriate to the gc log or lines being parsed
      */
     protected abstract GCLogParser parser();
+
+    GCLogParser getParser() {
+        return this.parser;
+    }
 
     /**
      * Parser runs in its own thread so start one for it and then feed it the lines to be parsed

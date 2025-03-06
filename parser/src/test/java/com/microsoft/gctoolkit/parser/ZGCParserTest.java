@@ -3,14 +3,16 @@
 package com.microsoft.gctoolkit.parser;
 
 import com.microsoft.gctoolkit.event.jvm.JVMEvent;
-import com.microsoft.gctoolkit.event.zgc.OccupancySummary;
-import com.microsoft.gctoolkit.event.zgc.ReclaimSummary;
-import com.microsoft.gctoolkit.event.zgc.ZGCCycle;
+import com.microsoft.gctoolkit.event.zgc.FullZGCCycle;
+import com.microsoft.gctoolkit.event.zgc.ZGCAllocatedSummary;
+import com.microsoft.gctoolkit.event.zgc.ZGCGarbageSummary;
+import com.microsoft.gctoolkit.event.zgc.ZGCLiveSummary;
 import com.microsoft.gctoolkit.event.zgc.ZGCMemoryPoolSummary;
+import com.microsoft.gctoolkit.event.zgc.ZGCMemorySummary;
 import com.microsoft.gctoolkit.event.zgc.ZGCMetaspaceSummary;
+import com.microsoft.gctoolkit.event.zgc.ZGCReclaimSummary;
 import com.microsoft.gctoolkit.jvm.Diarizer;
 import com.microsoft.gctoolkit.parser.jvm.UnifiedDiarizer;
-import com.microsoft.gctoolkit.parser.patterns.ParserTest;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -73,7 +75,7 @@ public class ZGCParserTest extends ParserTest {
         List<JVMEvent> singleCycle = feedParser(eventLogEntries);
         try {
             assertEquals(1, singleCycle.size());
-            ZGCCycle zgc = (ZGCCycle) singleCycle.get(0);
+            FullZGCCycle zgc = (FullZGCCycle) singleCycle.get(0);
 
             assertEquals(zgc.getGcId(), 2L);
 
@@ -109,12 +111,12 @@ public class ZGCParserTest extends ParserTest {
 
             assertTrue(checkZGCMetaSpaceSummary(zgc.getMetaspace(),61440, 61440, 1105920));
 
-            assertTrue(checkOccupancySummary(zgc.getLive(), 72704, 72704, 72704));
-            assertTrue(checkOccupancySummary(zgc.getAllocated(), 18432, 20480, 18432));
-            assertTrue(checkOccupancySummary(zgc.getGarbage(), 497664, 456704, 35840));
+            assertTrue(checkLiveSummary(zgc.getLive(), 72704, 72704, 72704));
+            assertTrue(checkAllocatedSummary(zgc.getAllocated(), 18432, 20480, 18432));
+            assertTrue(checkGarbageSummary(zgc.getGarbage(), 497664, 456704, 35840));
 
             assertTrue(checkReclaimSummary(zgc.getReclaimed(), 40960, 460800));
-            assertTrue(checkReclaimSummary(zgc.getMemorySummary(), 571392, 129024));
+            assertTrue(checkMemorySummary(zgc.getMemorySummary(), 571392, 129024));
 
             assertEquals(7.28, zgc.getLoadAverageAt(1));
             assertEquals(6.63, zgc.getLoadAverageAt(5));
@@ -132,20 +134,32 @@ public class ZGCParserTest extends ParserTest {
         }
     }
 
-    private boolean checkZGCMetaSpaceSummary(ZGCMetaspaceSummary summary, long used, long committed, long reserved) {
-        return summary.getUsed() == used && summary.getCommitted() == committed && summary.getReserved() == reserved;
-    }
-
     private boolean checkZGCMemoryPoolSummary(ZGCMemoryPoolSummary summary, long capacity, long free, long used) {
         return summary.getCapacity() == capacity && summary.getFree() == free && summary.getUsed() == used;
     }
 
-    private boolean checkOccupancySummary(OccupancySummary summary, long markEnd, long relocateStart, long relocateEnd) {
-        return summary.getMarkEnd() == markEnd && summary.getReclaimStart() == relocateStart && summary.getReclaimEnd() == relocateEnd;
+    private boolean checkZGCMetaSpaceSummary(ZGCMetaspaceSummary summary, long used, long committed, long reserved) {
+        return summary.getUsed() == used && summary.getCommitted() == committed && summary.getReserved() == reserved;
     }
 
-    private boolean checkReclaimSummary(ReclaimSummary summary, long relocateStart, long relocateEnd) {
+    private boolean checkLiveSummary(ZGCLiveSummary summary, long markEnd, long relocateStart, long relocateEnd) {
+                return summary.getMarkEnd() == markEnd && summary.getRelocateStart() == relocateStart && summary.getRelocateEnd() == relocateEnd;
+    }
+
+    private boolean checkAllocatedSummary(ZGCAllocatedSummary summary, long markEnd, long relocateStart, long relocateEnd) {
+        return summary.getMarkEnd() == markEnd && summary.getRelocateStart() == relocateStart && summary.getRelocateEnd() == relocateEnd;
+    }
+
+    private boolean checkGarbageSummary(ZGCGarbageSummary summary, long markEnd, long relocateStart, long relocateEnd) {
+        return summary.getMarkEnd() == markEnd && summary.getRelocateStart() == relocateStart && summary.getRelocateEnd() == relocateEnd;
+    }
+
+    private boolean checkReclaimSummary(ZGCReclaimSummary summary, long relocateStart, long relocateEnd) {
         return summary.getReclaimStart() == relocateStart && summary.getReclaimEnd() == relocateEnd;
+    }
+
+    private boolean checkMemorySummary(ZGCMemorySummary summary, long relocateStart, long relocateEnd) {
+        return summary.getOccupancyBefore() == relocateStart && summary.getOccupancyAfter() == relocateEnd;
     }
 
     private int toInt(double value, int significantDigits) {

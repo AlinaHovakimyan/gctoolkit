@@ -10,10 +10,14 @@ import com.microsoft.gctoolkit.event.UnifiedCountSummary;
 import com.microsoft.gctoolkit.event.UnifiedStatisticalSummary;
 import com.microsoft.gctoolkit.event.jvm.MetaspaceRecord;
 import com.microsoft.gctoolkit.event.jvm.PermGenSummary;
+import com.microsoft.gctoolkit.event.zgc.ZGCCollectionType;
+import com.microsoft.gctoolkit.event.zgc.ZGCPhase;
 
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
+
+import static com.microsoft.gctoolkit.event.zgc.ZGCPhase.FULL;
 
 /**
  * Class that represents a chunk of GC log that we are attempting to match to a
@@ -57,11 +61,11 @@ public class GCLogTrace extends AbstractLogTrace {
     }
 
     public GCCause gcCause(int offset) {
-        return gcCause(3, offset);
+        return gcCause(6, offset);
     }
 
     public GCCause gcCause() {
-        return gcCause(3, 0);
+        return gcCause(6, 0);
     }
 
     public double getPauseTime() {
@@ -82,6 +86,15 @@ public class GCLogTrace extends AbstractLogTrace {
      * @return The capture group parsed to a double.
      */
     public double getMilliseconds(int index) {
+        return getDoubleGroup(index);
+    }
+
+    /**
+     * Annoyingly we're assuming the field actually is s instead of confirming
+     * @param index Index of the capture group.
+     * @return The capture group parsed to a double.
+     */
+    public double getSeconds(int index) {
         return getDoubleGroup(index);
     }
 
@@ -182,7 +195,7 @@ public class GCLogTrace extends AbstractLogTrace {
             long size = toKBytes(offset + 4);
             return new MemoryPoolSummary(before, size, after, size);
         } catch (NumberFormatException numberFormatException) {
-            LOGGER.fine("Unable to calculate generational memory pool summary.");
+            LOGGER.warning("Unable to calculate generational memory pool summary.");
             notYetImplemented();
         }
 
@@ -194,6 +207,20 @@ public class GCLogTrace extends AbstractLogTrace {
         try {
             long occupancy = toKBytes(offset);
             long size = toKBytes(offset + 2);
+            return new MemoryPoolSummary(occupancy, size, occupancy, size);
+        } catch (NumberFormatException numberFormatException) {
+            LOGGER.fine("Unable to calculate generational memory pool occupancy summary.");
+            notYetImplemented();
+        }
+
+        return null;
+    }
+
+    public MemoryPoolSummary getOccupancyWithMemoryPoolSizeSummary() {
+
+        try {
+            long occupancy = toKBytes(1);
+            long size = toKBytes(3);
             return new MemoryPoolSummary(occupancy, size, occupancy, size);
         } catch (NumberFormatException numberFormatException) {
             LOGGER.fine("Unable to calculate generational memory pool occupancy summary.");
@@ -274,5 +301,9 @@ public class GCLogTrace extends AbstractLogTrace {
         }
         System.out.println("-----------------------------------------");
         //}
+    }
+
+    public ZGCPhase getZCollectionPhase() {
+        return ZGCPhase.get(getGroup(1));
     }
 }
