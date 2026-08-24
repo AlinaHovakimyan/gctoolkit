@@ -44,8 +44,6 @@ import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import static com.microsoft.gctoolkit.parser.unified.UnifiedG1GCPatterns.WEAK_PROCESSING;
 
@@ -626,9 +624,11 @@ public class GenerationalHeapParser extends PreUnifiedGCLogParser implements Sim
         gcCauseForwardReference = GCCause.PROMOTION_FAILED;
         ArrayList<Integer> blocks = new ArrayList<>();
         GCLogTrace block = PARNEW_PROMOTION_FAILURE_SIZE_BLOCK.parse(line);
-        do {
-            blocks.add(block.getIntegerGroup(1));
-        } while (block.hasNext());
+        if (block != null) {
+            do {
+                blocks.add(block.getIntegerGroup(1));
+            } while (block.hasNext());
+        }
         promotionFailureSizesForwardReference = new int[blocks.size()];
         for (int index = 0; index < blocks.size(); index++)
             promotionFailureSizesForwardReference[index] = blocks.get(index);
@@ -1817,7 +1817,8 @@ public class GenerationalHeapParser extends PreUnifiedGCLogParser implements Sim
     private void precleanTimedoutWithCards(GCLogTrace trace, String line) {
         abortPrecleanDueToTime = true;
         GCLogTrace concurrentPhase = new GCParseRule("X",CMS_PHASE_END).parse(line);
-        endOfConcurrentPhase(concurrentPhase, concurrentPhase.getDateTimeStamp(), 0);
+        if (concurrentPhase != null)
+            endOfConcurrentPhase(concurrentPhase, concurrentPhase.getDateTimeStamp(), 0);
     }
 
     private void shouldCollectConcurrent(GCLogTrace trace, String line) {
@@ -1917,11 +1918,10 @@ public class GenerationalHeapParser extends PreUnifiedGCLogParser implements Sim
      */
     public void splitRemarkReferenceWithWeakReferenceSplitBug(GCLogTrace trace, String line) {
         GCLogTrace remarkTrace = REMARK_CLAUSE.parse(line);
-        Pattern durationGroupPattern = Pattern.compile(".* " + PAUSE_TIME);
-        Matcher matcher = durationGroupPattern.matcher(line);
+        GCLogTrace durationTrace = SPLIT_REMARK_REFERENCE_BUG_DURATION.parse(line);
         double duration = 0.0d;
-        if (matcher.find()) {
-            duration = Double.parseDouble(matcher.group(matcher.groupCount()));
+        if (durationTrace != null) {
+            duration = durationTrace.getPauseTime();
         }
         CMSRemark collection = new CMSRemark(getClock(), GCCause.CMS_FINAL_REMARK, duration);
         MemoryPoolSummary tenured = getTotalOccupancyWithTotalHeapSizeSummary(remarkTrace, 1);
@@ -2067,6 +2067,10 @@ public class GenerationalHeapParser extends PreUnifiedGCLogParser implements Sim
 
     private void endConcurrentPrecleanWithReferenceProcessing(GCLogTrace trace, String line) {
         GCLogTrace concurrentBlock = CONCURRENT_PHASE_END_BLOCK.parse(line);
+        if (concurrentBlock == null) {
+            LOGGER.warning("Unable to extract data from " + trace.toString());
+            return;
+        }
         try {
             publish(new ConcurrentPreClean(startOfConcurrentPhase, concurrentBlock.getDoubleGroup(11), concurrentBlock.getDoubleGroup(7), concurrentBlock.getDoubleGroup(8)));
         } catch (Throwable t) {
